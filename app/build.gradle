@@ -157,6 +157,8 @@ android {
         resources {
             excludes += ['META-INF/DEPENDENCIES']
         }
+
+        doNotStrip "**/*.so"
     }
 
     buildFeatures {
