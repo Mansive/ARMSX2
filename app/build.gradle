@@ -66,7 +66,7 @@ android {
         externalNativeBuild {
             cmake {
                 def stlLib = enableRN ? "c++_shared" : "c++_static"
-                arguments "-DANDROID=true", "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DANDROID_STL=${stlLib}", "-DENABLE_RAINTEGRATION=ON"
+                arguments "-DANDROID=true", "-DCMAKE_BUILD_TYPE=Debug", "-DANDROID_STL=${stlLib}", "-DENABLE_RAINTEGRATION=ON"
                 if (isSwitchBuild) {
                     arguments "-DSWITCHBUILD=ON"
                     cFlags "-D__NINTENDO_SWITCH__"
