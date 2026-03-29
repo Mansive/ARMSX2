@@ -39,7 +39,6 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CompoundButton;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -55,6 +54,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.core.content.ContextCompat;
 import androidx.core.util.Pair;
 import androidx.core.view.GravityCompat;
@@ -497,7 +497,7 @@ public class MainActivity extends AppCompatActivity {
         androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
             String displayName = DeviceProfiles.getProductDisplayName(this, getString(R.string.app_name));
-            toolbar.setTitle(displayName + " Game Selector");
+            toolbar.setTitle(getString(R.string.home_game_selector_title_format, displayName));
             try {
                 androidx.appcompat.graphics.drawable.DrawerArrowDrawable dd = new androidx.appcompat.graphics.drawable.DrawerArrowDrawable(this);
                 dd.setProgress(0f); 
@@ -546,7 +546,7 @@ public class MainActivity extends AppCompatActivity {
                             Class<?> rnClass = Class.forName("kr.co.iefriends.pcsx2.RNActivity");
                             startActivity(new Intent(this, rnClass));
                         } catch (Throwable t) {
-                            try { Toast.makeText(this, "React Native screen unavailable", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+                            try { Toast.makeText(this, R.string.home_react_native_unavailable, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
                         }
                         return true;
                     }
@@ -569,12 +569,12 @@ public class MainActivity extends AppCompatActivity {
                 pickGamesFolder();
         } else if (id == R.id.menu_refresh) {
             if (gamesFolderUri != null) scanGamesFolder(gamesFolderUri);
-            else try { Toast.makeText(this, "Choose a games folder first", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+            else try { Toast.makeText(this, R.string.home_choose_folder_first, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
         } else if (id == R.id.menu_covers) {
             promptForCoversUrl();
         } else if (id == R.id.menu_clear_cover_url) {
             setCoversUrlTemplate("");
-            try { Toast.makeText(this, "Cover URL cleared.", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+            try { Toast.makeText(this, R.string.home_cover_url_cleared, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
             if (gamesFolderUri != null) scanGamesFolder(gamesFolderUri);
         } else if (id == R.id.menu_bg_landscape) {
             pickBackgroundImage(false);
@@ -1378,89 +1378,40 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException ignored) {}
     }
 
-    private void showGameOptionsDialog(GameEntry e) {
+    private void showGameOptionsPopup(View anchorView, GameEntry e) {
         if (e == null) return;
         String key = gameKeyFromEntry(e);
         String existing = getManualCoverUri(key);
-        android.widget.LinearLayout container = new android.widget.LinearLayout(this);
-        container.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = (int) (16 * getResources().getDisplayMetrics().density);
-        container.setPadding(pad, pad, pad, pad);
-        container.setBackgroundColor(0xEE222222);
-        android.widget.TextView title = new android.widget.TextView(this);
-        title.setText(e.gameTitle != null ? e.gameTitle : e.title);
-        title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(18);
-        title.setPadding(0, 0, 0, pad / 2);
-        container.addView(title);
-
-    float density = getResources().getDisplayMetrics().density;
-    int primary = resolveThemeColor(android.R.attr.colorPrimary);
-    int onPrimary = resolveThemeColor(android.R.attr.textColorPrimary);
-    int surfaceVariant = resolveThemeColor(android.R.attr.colorBackground);
-    int onSurface = resolveThemeColor(android.R.attr.textColorPrimary);
-    int secondary = resolveThemeColor(com.google.android.material.R.attr.colorSecondary);
-    int onSecondary = resolveThemeColor(com.google.android.material.R.attr.colorOnSecondary);
-    int spacing = (int) (8f * density);
-
-    MaterialButton pick = new MaterialButton(this);
-    LinearLayout.LayoutParams pickParams = new LinearLayout.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    pickParams.topMargin = spacing;
-    pick.setLayoutParams(pickParams);
-    pick.setText(getString(R.string.cover_action_choose));
-    pick.setBackgroundTintList(ColorStateList.valueOf(primary));
-    pick.setTextColor(onPrimary);
-    container.addView(pick);
-
-        MaterialAlertDialogBuilder mBuilder = new MaterialAlertDialogBuilder(this)
-                .setView(container)
-                .setNegativeButton(android.R.string.cancel, (d, w) -> d.dismiss());
-        AlertDialog dlg = mBuilder.create();
-
-        pick.setOnClickListener(v -> {
-            dlg.dismiss();
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("image/*");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-            pendingManualCoverGameKey = key;
-            startActivityResultPickImage.launch(intent);
-        });
-
-        if (existing != null) {
-            MaterialButton remove = new MaterialButton(this);
-            LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            removeParams.topMargin = spacing;
-            remove.setLayoutParams(removeParams);
-            remove.setText(getString(R.string.cover_action_remove));
-            remove.setBackgroundTintList(ColorStateList.valueOf(surfaceVariant));
-            remove.setTextColor(onSurface);
-            container.addView(remove);
-            remove.setOnClickListener(v -> {
-                dlg.dismiss();
+        PopupMenu menu = new PopupMenu(this, anchorView);
+        menu.inflate(R.menu.game_options_menu);
+        MenuItem removeChosenCoverMenuItem = menu.getMenu().findItem(R.id.remove_chosen_cover);
+        removeChosenCoverMenuItem.setVisible(existing != null);
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.choose_cover) {
+                launchCoverImagePicker(key);
+                return true;
+            }
+            if (item.getItemId() == R.id.remove_chosen_cover) {
                 removeManualCoverUri(key);
                 if (gamesFolderUri != null) scanGamesFolder(gamesFolderUri);
-            });
-        }
-
-        MaterialButton perGame = new MaterialButton(this);
-        LinearLayout.LayoutParams perGameParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        perGameParams.topMargin = spacing * 2;
-        perGame.setLayoutParams(perGameParams);
-        perGame.setText(getString(R.string.per_game_settings_button));
-        perGame.setBackgroundTintList(ColorStateList.valueOf(secondary));
-        perGame.setTextColor(onSecondary);
-        container.addView(perGame);
-
-        perGame.setOnClickListener(v -> {
-            dlg.dismiss();
-            showPerGameSettingsDialog(e);
+                return true;
+            }
+            if (item.getItemId() == R.id.per_game_settings) {
+                showPerGameSettingsDialog(e);
+                return true;
+            }
+            return false;
         });
+        menu.show();
+    }
 
-        dlg.show();
+    private void launchCoverImagePicker(String key) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        pendingManualCoverGameKey = key;
+        startActivityResultPickImage.launch(intent);
     }
 
     private void showPerGameSettingsDialog(GameEntry entry) {
@@ -1996,12 +1947,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void ensureBiosPresent() {
     if (!hasBios()) {
-        Toast.makeText(this, "ARMSX2 no bios found!", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, R.string.home_bios_missing_toast, Toast.LENGTH_LONG).show();
         new MaterialAlertDialogBuilder(this)
-            .setMessage("No PS2 BIOS found. Please choose a BIOS file.")
+            .setMessage(R.string.home_bios_missing_message)
             .setCancelable(true)
-            .setNegativeButton("Close", (d, w) -> d.dismiss())
-            .setPositiveButton("Choose BIOS", (d, w) -> openBiosPicker())
+            .setNegativeButton(R.string.home_close, (d, w) -> d.dismiss())
+            .setPositiveButton(R.string.onboarding_bios_select, (d, w) -> openBiosPicker())
             .show();
         } else {
             // BIOS is present, signal we’re gameplay-ready.
@@ -2047,9 +1998,9 @@ public class MainActivity extends AppCompatActivity {
             int n;
             while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
             out.flush();
-            Toast.makeText(this, "BIOS saved", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.onboarding_bios_saved, Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
-            Toast.makeText(this, "Failed to save BIOS", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, R.string.onboarding_bios_write_error, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -2098,9 +2049,9 @@ public class MainActivity extends AppCompatActivity {
             int n;
             while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
             out.flush();
-            Toast.makeText(this, "Imported BIOS: " + outFile.getName(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.home_bios_imported, outFile.getName()), Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
-            Toast.makeText(this, "Failed to import BIOS", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, R.string.home_bios_import_failed, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -2129,16 +2080,16 @@ public class MainActivity extends AppCompatActivity {
         } catch (Throwable ignored) {}
 
         MaterialAlertDialogBuilder b = new MaterialAlertDialogBuilder(this)
-                .setTitle("BIOS Selection")
+                .setTitle(R.string.home_bios_selection_title)
                 .setSingleChoiceItems(names, checked, (d, which) -> {
                     try {
                         String path = biosList.get(which).getAbsolutePath();
                         NativeApp.setSetting("Filenames", "BIOS", "string", path);
-                        Toast.makeText(this, "Current BIOS: " + biosList.get(which).getName(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, getString(R.string.home_bios_current, biosList.get(which).getName()), Toast.LENGTH_SHORT).show();
                     } catch (Throwable ignored) {}
                 })
-                .setNegativeButton("Close", (d, w) -> d.dismiss())
-                .setPositiveButton("Import", (d, w) -> openBiosImportForManager());
+                .setNegativeButton(R.string.home_close, (d, w) -> d.dismiss())
+                .setPositiveButton(R.string.home_import, (d, w) -> openBiosImportForManager());
         b.show();
     }
 
@@ -2987,24 +2938,24 @@ public class MainActivity extends AppCompatActivity {
 
     private void showGameStateDialog() {
         CharSequence[] items = new CharSequence[]{
-                "Save state (slot 1)",
-                "Load state (slot 1)"
+                getString(R.string.home_game_state_save_slot_1),
+                getString(R.string.home_game_state_load_slot_1)
         };
     new MaterialAlertDialogBuilder(this)
-        .setTitle("Game State")
+        .setTitle(R.string.home_game_state_title)
                 .setItems(items, (dialog, which) -> {
                     if (which == 0) {
                         pauseVmForStateOperation();
                         boolean ok = NativeApp.saveStateToSlot(1);
                         try {
-                            Toast.makeText(this, ok ? "State saved" : "Failed to save state", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, ok ? R.string.home_game_state_saved : R.string.home_game_state_save_failed, Toast.LENGTH_SHORT).show();
                         } catch (Throwable ignored) {}
                         resumeVmAfterStateOperation();
                     } else if (which == 1) {
                         pauseVmForStateOperation();
                         boolean ok = NativeApp.loadStateFromSlot(1);
                         try {
-                            Toast.makeText(this, ok ? "State loaded" : "Failed to load state", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, ok ? R.string.home_game_state_loaded : R.string.home_game_state_load_failed, Toast.LENGTH_SHORT).show();
                         } catch (Throwable ignored) {}
                         if (!ok) {
                             resumeVmAfterStateOperation();
@@ -3785,9 +3736,9 @@ public class MainActivity extends AppCompatActivity {
                 NativeApp.setSetting("MemoryCards", "Slot1_Enable", "bool", "false");
                 NativeApp.setSetting("MemoryCards", "Slot1_Filename", "string", "Mcd001.ps2");
                 NativeApp.setSetting("MemoryCards", "Slot1_Enable", "bool", "true");
-                Toast.makeText(this, "Memory card inserted (Slot 1)", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.settings_memory_card_inserted_slot1, Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Failed to import memory card", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, R.string.settings_memory_card_import_failed, Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -3985,7 +3936,7 @@ public class MainActivity extends AppCompatActivity {
         String resolvedPath = DataDirectoryManager.resolveTreeUriToPath(this, tree);
         if (resolvedPath == null || resolvedPath.trim().isEmpty()) {
             try {
-                Toast.makeText(this, "Unable to use selected folder", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, R.string.onboarding_storage_unusable, Toast.LENGTH_LONG).show();
             } catch (Throwable ignored) {}
             storagePromptShown = false;
             maybeShowDataDirectoryPrompt();
@@ -3994,7 +3945,7 @@ public class MainActivity extends AppCompatActivity {
         File targetDir = new File(resolvedPath);
         if (!targetDir.exists() && !targetDir.mkdirs()) {
             try {
-                Toast.makeText(this, "Cannot create folders in the selected location", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, R.string.onboarding_storage_create_failed, Toast.LENGTH_LONG).show();
             } catch (Throwable ignored) {}
             storagePromptShown = false;
             maybeShowDataDirectoryPrompt();
@@ -4013,7 +3964,7 @@ public class MainActivity extends AppCompatActivity {
             DataDirectoryManager.markPromptDone(this);
             storagePromptShown = true;
             try {
-                Toast.makeText(this, "Already using that folder", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.onboarding_storage_already_using, Toast.LENGTH_SHORT).show();
             } catch (Throwable ignored) {}
             return;
         }
@@ -4039,11 +3990,11 @@ public class MainActivity extends AppCompatActivity {
                     DataDirectoryManager.markPromptDone(this);
                     storagePromptShown = true;
                     try {
-                        Toast.makeText(this, "Data location updated", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, R.string.onboarding_storage_moved, Toast.LENGTH_LONG).show();
                     } catch (Throwable ignored) {}
                 } else {
                     try {
-                        Toast.makeText(this, "Failed to move data", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, R.string.onboarding_storage_move_failed, Toast.LENGTH_LONG).show();
                     } catch (Throwable ignored) {}
                     storagePromptShown = false;
                     maybeShowDataDirectoryPrompt();
@@ -4120,7 +4071,7 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     String p = m_szGamefile;
                     if (p != null && !p.isEmpty()) {
-                        Toast.makeText(this, "Launching: " + p, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, getString(R.string.home_launching_game, p), Toast.LENGTH_SHORT).show();
                     }
                 } catch (Throwable ignored) {}
             });
@@ -4511,7 +4462,7 @@ public class MainActivity extends AppCompatActivity {
             i.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
             startActivityResultPickIso.launch(i);
         } catch (Throwable t) {
-            try { Toast.makeText(this, "Unable to open file picker", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+            try { Toast.makeText(this, R.string.home_unable_open_file_picker, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
         }
     }
 
@@ -5113,9 +5064,9 @@ public class MainActivity extends AppCompatActivity {
             });
         }
         boolean empty = entries.isEmpty();
-    try { Toast.makeText(this, "Found " + entries.size() + " game(s)", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+    try { Toast.makeText(this, getString(R.string.home_games_found_count, entries.size()), Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
         if (tvEmpty != null) {
-            tvEmpty.setText(empty ? "No games detected in this folder" : "");
+            tvEmpty.setText(empty ? getString(R.string.home_no_games_detected) : "");
             tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
         }
         if (emptyContainer != null) emptyContainer.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -5197,7 +5148,7 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Throwable ignored) {}
         if (show && tvEmpty != null && gamesFolderUri == null) {
-            tvEmpty.setText("Choose a games folder");
+            tvEmpty.setText(R.string.home_nav_choose_games_folder);
             tvEmpty.setVisibility(View.VISIBLE);
             if (emptyContainer != null) emptyContainer.setVisibility(View.VISIBLE);
             if (rvGames != null) rvGames.setVisibility(View.GONE);
@@ -5318,7 +5269,7 @@ public class MainActivity extends AppCompatActivity {
     private void clearBackgroundImages() {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(PREF_BG_L).remove(PREF_BG_P).apply();
         if (bgImage != null) { bgImage.setImageDrawable(null); bgImage.setVisibility(View.GONE); }
-        try { Toast.makeText(this, "Background cleared.", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+        try { Toast.makeText(this, R.string.home_background_cleared, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
     }
     // endregion Background image picker
 
@@ -5334,7 +5285,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         // Start BIOS first
-        try { Toast.makeText(this, "Preflight: booting BIOS…", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+        try { Toast.makeText(this, R.string.home_preflight_boot_bios, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
         pendingGameUri = uri;
         pendingLaunchRetries = 0;
         bootBios();
@@ -5345,7 +5296,7 @@ public class MainActivity extends AppCompatActivity {
     private final Runnable pendingLaunchRunnable = new Runnable() {
         @Override public void run() {
             if (pendingGameUri == null) return;
-            try { Toast.makeText(MainActivity.this, "Preflight: launching selected game…", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+            try { Toast.makeText(MainActivity.this, R.string.home_preflight_launch_selected_game, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
             Uri toLaunch = pendingGameUri;
             pendingGameUri = null;
             handleSelectedGameUri(toLaunch);
@@ -6376,7 +6327,7 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             });
             holder.itemView.setOnLongClickListener(v -> {
-                try { ((MainActivity)holder.itemView.getContext()).showGameOptionsDialog(e); } catch (Throwable ignored) {}
+                try { ((MainActivity)holder.itemView.getContext()).showGameOptionsPopup(v, e); } catch (Throwable ignored) {}
                 return true;
             });
         }
